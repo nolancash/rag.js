@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>rag.js Demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+    }
+    h1 { color: #00d9ff; }
+    .section {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    h2 { margin-top: 0; color: #00d9ff; font-size: 1.1rem; }
+    textarea {
+      width: 100%;
+      height: 100px;
+      padding: 10px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #0f0f23;
+      color: #eee;
+      font-family: inherit;
+      resize: vertical;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #0f0f23;
+      color: #eee;
+      font-size: 1rem;
+    }
+    button {
+      background: #00d9ff;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    button:hover { background: #00b8d9; }
+    button:disabled { background: #555; color: #888; cursor: not-allowed; }
+    #status {
+      padding: 10px;
+      background: #0f0f23;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      font-family: monospace;
+    }
+    #results {
+      margin-top: 15px;
+    }
+    .result {
+      background: #0f0f23;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      border-left: 3px solid #00d9ff;
+    }
+    .result .score {
+      color: #00d9ff;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    .result .content {
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    .loading { color: #ffa500; }
+    .success { color: #00ff88; }
+    .error { color: #ff4444; }
+  </style>
+</head>
+<body>
+  <h1>🔍 rag.js Demo</h1>
+  
+  <div id="status" class="loading">Loading transformers.js and rag.js...</div>
+
+  <div class="section">
+    <h2>📄 Add Documents</h2>
+    <textarea id="docInput" placeholder="Enter document text to add to the index...">JavaScript is a programming language commonly used for web development. It runs in browsers and on servers with Node.js. JavaScript is dynamically typed and supports functional and object-oriented programming styles.
+
+TypeScript is a typed superset of JavaScript developed by Microsoft. It adds optional static typing, classes, and interfaces. TypeScript compiles to plain JavaScript and helps catch errors at compile time.
+
+Python is a high-level programming language known for its readability. It's widely used in data science, machine learning, web development, and automation. Python emphasizes code simplicity and has a large ecosystem of libraries.
+
+Rust is a systems programming language focused on safety and performance. It prevents memory errors without garbage collection through its ownership system. Rust is used for web browsers, game engines, and operating systems.</textarea>
+    <button id="addBtn" disabled>Add Documents</button>
+    <span id="docCount" style="margin-left: 15px; color: #888;"></span>
+  </div>
+
+  <div class="section">
+    <h2>🔎 Search</h2>
+    <input type="text" id="searchInput" placeholder="Enter your search query..." value="What language is good for web development?">
+    <button id="searchBtn" disabled>Search</button>
+    <div id="results"></div>
+  </div>
+
+  <script type="module">
+    import { RAG } from 'https://esm.sh/rag.js@0.1.0';
+    import { pipeline, env } from 'https://esm.sh/@xenova/transformers@2.17.2';
+
+    // Configure transformers.js for browser
+    env.allowLocalModels = false;
+
+    const status = document.getElementById('status');
+    const addBtn = document.getElementById('addBtn');
+    const searchBtn = document.getElementById('searchBtn');
+    const docInput = document.getElementById('docInput');
+    const searchInput = document.getElementById('searchInput');
+    const results = document.getElementById('results');
+    const docCount = document.getElementById('docCount');
+
+    let rag = null;
+    let embedder = null;
+
+    // Custom embedding provider using transformers.js
+    class BrowserEmbedding {
+      constructor(pipe) {
+        this.pipeline = pipe;
+        this.model = 'Xenova/all-MiniLM-L6-v2';
+        this.dimensions = 384;
+      }
+
+      async embed(texts) {
+        const results = [];
+        for (const text of texts) {
+          const output = await this.pipeline(text, { pooling: 'mean', normalize: true });
+          results.push(Array.from(output.data));
+        }
+        return results;
+      }
+    }
+
+    async function init() {
+      try {
+        status.textContent = 'Loading embedding model (first load downloads ~23MB)...';
+        status.className = 'loading';
+
+        // Load the embedding pipeline
+        embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+          quantized: true,
+        });
+
+        // Create RAG with browser embedding
+        rag = RAG.withEmbedding(new BrowserEmbedding(embedder));
+
+        status.textContent = '✓ Ready! Add documents and search.';
+        status.className = 'success';
+        addBtn.disabled = false;
+        searchBtn.disabled = false;
+
+      } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+        status.className = 'error';
+        console.error(err);
+      }
+    }
+
+    addBtn.addEventListener('click', async () => {
+      const text = docInput.value.trim();
+      if (!text) return;
+
+      addBtn.disabled = true;
+      addBtn.textContent = 'Adding...';
+
+      try {
+        // Split by double newlines into separate documents
+        const docs = text.split(/\n\n+/).filter(d => d.trim());
+        
+        for (let i = 0; i < docs.length; i++) {
+          status.textContent = `Embedding document ${i + 1}/${docs.length}...`;
+          await rag.addDocument(`doc-${Date.now()}-${i}`, docs[i].trim());
+        }
+
+        status.textContent = `✓ Added ${docs.length} document(s). Total chunks: ${rag.size}`;
+        status.className = 'success';
+        docCount.textContent = `(${rag.size} chunks indexed)`;
+
+      } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+        status.className = 'error';
+      }
+
+      addBtn.disabled = false;
+      addBtn.textContent = 'Add Documents';
+    });
+
+    searchBtn.addEventListener('click', async () => {
+      const query = searchInput.value.trim();
+      if (!query) return;
+
+      searchBtn.disabled = true;
+      searchBtn.textContent = 'Searching...';
+      results.innerHTML = '';
+
+      try {
+        status.textContent = 'Searching...';
+        const searchResults = await rag.search(query, { topK: 3 });
+
+        if (searchResults.length === 0) {
+          results.innerHTML = '<p style="color: #888;">No results found. Try adding some documents first.</p>';
+        } else {
+          results.innerHTML = searchResults.map((r, i) => `
+            <div class="result">
+              <div class="score">#${i + 1} — Score: ${(r.score * 100).toFixed(1)}%</div>
+              <div class="content">${escapeHtml(r.chunk.content)}</div>
+            </div>
+          `).join('');
+        }
+
+        status.textContent = `✓ Found ${searchResults.length} result(s)`;
+        status.className = 'success';
+
+      } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+        status.className = 'error';
+        console.error(err);
+      }
+
+      searchBtn.disabled = false;
+      searchBtn.textContent = 'Search';
+    });
+
+    // Handle enter key in search
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !searchBtn.disabled) {
+        searchBtn.click();
+      }
+    });
+
+    function escapeHtml(text) {
+      return text.replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[c]);
+    }
+
+    // Start loading
+    init();
+  </script>
+</body>
+</html>
