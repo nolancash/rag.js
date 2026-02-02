@@ -8,13 +8,14 @@
     * { box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 800px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 20px;
       background: #1a1a2e;
       color: #eee;
     }
-    h1 { color: #00d9ff; }
+    h1 { color: #00d9ff; margin-bottom: 5px; }
+    .subtitle { color: #888; margin-bottom: 20px; }
     .section {
       background: #16213e;
       border-radius: 8px;
@@ -24,18 +25,19 @@
     h2 { margin-top: 0; color: #00d9ff; font-size: 1.1rem; }
     textarea {
       width: 100%;
-      height: 100px;
+      height: 120px;
       padding: 10px;
       border: 1px solid #333;
       border-radius: 4px;
       background: #0f0f23;
       color: #eee;
       font-family: inherit;
+      font-size: 0.9rem;
       resize: vertical;
     }
     input[type="text"] {
       width: 100%;
-      padding: 10px;
+      padding: 12px;
       border: 1px solid #333;
       border-radius: 4px;
       background: #0f0f23;
@@ -51,19 +53,24 @@
       cursor: pointer;
       font-weight: bold;
       margin-top: 10px;
+      margin-right: 10px;
     }
     button:hover { background: #00b8d9; }
     button:disabled { background: #555; color: #888; cursor: not-allowed; }
+    button.secondary {
+      background: #333;
+      color: #eee;
+    }
+    button.secondary:hover { background: #444; }
     #status {
-      padding: 10px;
+      padding: 12px;
       background: #0f0f23;
       border-radius: 4px;
       margin-bottom: 20px;
       font-family: monospace;
+      font-size: 0.9rem;
     }
-    #results {
-      margin-top: 15px;
-    }
+    #results { margin-top: 15px; }
     .result {
       background: #0f0f23;
       padding: 15px;
@@ -74,39 +81,117 @@
     .result .score {
       color: #00d9ff;
       font-weight: bold;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
+    }
+    .result .meta {
+      color: #888;
+      font-size: 0.8rem;
+      margin-left: 10px;
     }
     .result .content {
       margin-top: 8px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
     .loading { color: #ffa500; }
     .success { color: #00ff88; }
     .error { color: #ff4444; }
+    .tabs {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 15px;
+    }
+    .tab {
+      padding: 8px 16px;
+      background: #0f0f23;
+      border: 1px solid #333;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #888;
+    }
+    .tab.active {
+      background: #00d9ff;
+      color: #000;
+      border-color: #00d9ff;
+      font-weight: bold;
+    }
+    .tab:hover:not(.active) { background: #1a1a2e; }
+    .mode-info {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #0f0f23;
+      border-radius: 4px;
+    }
+    .sample-queries {
+      margin-top: 10px;
+      font-size: 0.85rem;
+    }
+    .sample-queries span {
+      display: inline-block;
+      background: #0f0f23;
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin: 3px 5px 3px 0;
+      cursor: pointer;
+      color: #00d9ff;
+    }
+    .sample-queries span:hover { background: #1a1a3e; }
+    .doc-count {
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
-  <h1>🔍 rag.js Demo</h1>
+  <h1>🔍 rag.js</h1>
+  <p class="subtitle">RAG for transformers.js — runs entirely in your browser</p>
   
   <div id="status" class="loading">Loading transformers.js and rag.js...</div>
 
   <div class="section">
-    <h2>📄 Add Documents</h2>
-    <textarea id="docInput" placeholder="Enter document text to add to the index...">JavaScript is a programming language commonly used for web development. It runs in browsers and on servers with Node.js. JavaScript is dynamically typed and supports functional and object-oriented programming styles.
+    <h2>⚡ Mode</h2>
+    <div class="tabs">
+      <div class="tab active" data-mode="dynamic">Dynamic</div>
+      <div class="tab" data-mode="precompiled">Precompiled</div>
+    </div>
+    <div class="mode-info" id="modeInfo">
+      <strong>Dynamic mode:</strong> Embeddings computed in real-time. Add any documents and search instantly.
+    </div>
+  </div>
 
-TypeScript is a typed superset of JavaScript developed by Microsoft. It adds optional static typing, classes, and interfaces. TypeScript compiles to plain JavaScript and helps catch errors at compile time.
+  <div class="section" id="dynamicSection">
+    <h2>📄 Documents</h2>
+    <textarea id="docInput" placeholder="Enter documents (separate with blank lines)..."></textarea>
+    <div>
+      <button id="addBtn" disabled>Add Documents</button>
+      <button id="loadSampleBtn" class="secondary" disabled>Load Sample Docs</button>
+      <button id="clearBtn" class="secondary" disabled>Clear All</button>
+    </div>
+    <div class="doc-count" id="docCount"></div>
+  </div>
 
-Python is a high-level programming language known for its readability. It's widely used in data science, machine learning, web development, and automation. Python emphasizes code simplicity and has a large ecosystem of libraries.
-
-Rust is a systems programming language focused on safety and performance. It prevents memory errors without garbage collection through its ownership system. Rust is used for web browsers, game engines, and operating systems.</textarea>
-    <button id="addBtn" disabled>Add Documents</button>
-    <span id="docCount" style="margin-left: 15px; color: #888;"></span>
+  <div class="section" id="precompiledSection" style="display: none;">
+    <h2>📦 Precompiled Index</h2>
+    <div class="mode-info">
+      Index was built at deploy time. No embedding computation needed — instant search!
+    </div>
+    <div class="doc-count" id="precompiledCount"></div>
   </div>
 
   <div class="section">
     <h2>🔎 Search</h2>
-    <input type="text" id="searchInput" placeholder="Enter your search query..." value="What language is good for web development?">
+    <input type="text" id="searchInput" placeholder="Enter your search query...">
     <button id="searchBtn" disabled>Search</button>
+    <div class="sample-queries">
+      Try: 
+      <span>web development</span>
+      <span>memory safety</span>
+      <span>machine learning</span>
+      <span>static typing</span>
+      <span>functional programming</span>
+    </div>
     <div id="results"></div>
   </div>
 
@@ -114,28 +199,73 @@ Rust is a systems programming language focused on safety and performance. It pre
     import { RAG } from 'https://esm.sh/rag.js@0.1.0';
     import { pipeline, env } from 'https://esm.sh/@xenova/transformers@2.17.2';
 
-    // Configure transformers.js for browser
     env.allowLocalModels = false;
 
     const status = document.getElementById('status');
     const addBtn = document.getElementById('addBtn');
+    const loadSampleBtn = document.getElementById('loadSampleBtn');
+    const clearBtn = document.getElementById('clearBtn');
     const searchBtn = document.getElementById('searchBtn');
     const docInput = document.getElementById('docInput');
     const searchInput = document.getElementById('searchInput');
     const results = document.getElementById('results');
     const docCount = document.getElementById('docCount');
+    const precompiledCount = document.getElementById('precompiledCount');
+    const modeInfo = document.getElementById('modeInfo');
+    const dynamicSection = document.getElementById('dynamicSection');
+    const precompiledSection = document.getElementById('precompiledSection');
 
-    let rag = null;
+    let dynamicRag = null;
+    let precompiledRag = null;
     let embedder = null;
+    let currentMode = 'dynamic';
 
-    // Custom embedding provider using transformers.js
+    // Sample documents
+    const sampleDocs = [
+      {
+        id: 'javascript',
+        content: `JavaScript is a versatile programming language primarily used for web development. It runs in browsers and on servers via Node.js. JavaScript supports multiple paradigms including functional, object-oriented, and event-driven programming. It's dynamically typed and features first-class functions, closures, and prototypal inheritance.`
+      },
+      {
+        id: 'typescript', 
+        content: `TypeScript is a strongly typed superset of JavaScript developed by Microsoft. It adds optional static typing, interfaces, enums, and advanced type features. TypeScript compiles to plain JavaScript and helps catch errors at compile time rather than runtime. It's widely used for large-scale applications.`
+      },
+      {
+        id: 'python',
+        content: `Python is a high-level, interpreted programming language known for its clear syntax and readability. It's extensively used in data science, machine learning, artificial intelligence, web development, and automation. Python has a vast ecosystem of libraries including NumPy, Pandas, TensorFlow, and Django.`
+      },
+      {
+        id: 'rust',
+        content: `Rust is a systems programming language focused on safety, speed, and concurrency. It prevents memory errors and data races at compile time through its ownership system, without needing garbage collection. Rust is used for web browsers, game engines, operating systems, and WebAssembly.`
+      },
+      {
+        id: 'go',
+        content: `Go (Golang) is a statically typed language developed by Google for building simple, reliable, and efficient software. It features garbage collection, structural typing, and CSP-style concurrency with goroutines and channels. Go is popular for cloud services, microservices, and DevOps tools.`
+      },
+      {
+        id: 'react',
+        content: `React is a JavaScript library for building user interfaces, developed by Facebook. It uses a component-based architecture and a virtual DOM for efficient updates. React supports JSX syntax, hooks for state management, and has a large ecosystem including Next.js for server-side rendering.`
+      },
+      {
+        id: 'ml-basics',
+        content: `Machine learning is a subset of artificial intelligence where systems learn from data to improve performance. It includes supervised learning (classification, regression), unsupervised learning (clustering, dimensionality reduction), and reinforcement learning. Common algorithms include neural networks, decision trees, and support vector machines.`
+      },
+      {
+        id: 'databases',
+        content: `Databases store and organize data for efficient retrieval. SQL databases like PostgreSQL and MySQL use structured tables and ACID transactions. NoSQL databases like MongoDB and Redis offer flexible schemas and horizontal scaling. Vector databases like Pinecone specialize in similarity search for AI applications.`
+      }
+    ];
+
+    // Precompiled index (generated offline, embedded here for demo)
+    let precompiledIndex = null;
+
+    // Browser embedding provider
     class BrowserEmbedding {
       constructor(pipe) {
         this.pipeline = pipe;
         this.model = 'Xenova/all-MiniLM-L6-v2';
         this.dimensions = 384;
       }
-
       async embed(texts) {
         const results = [];
         for (const text of texts) {
@@ -148,21 +278,25 @@ Rust is a systems programming language focused on safety and performance. It pre
 
     async function init() {
       try {
-        status.textContent = 'Loading embedding model (first load downloads ~23MB)...';
+        status.textContent = 'Loading embedding model (~23MB, cached after first load)...';
         status.className = 'loading';
 
-        // Load the embedding pipeline
         embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
           quantized: true,
         });
 
-        // Create RAG with browser embedding
-        rag = RAG.withEmbedding(new BrowserEmbedding(embedder));
+        dynamicRag = RAG.withEmbedding(new BrowserEmbedding(embedder));
 
-        status.textContent = '✓ Ready! Add documents and search.';
+        status.textContent = '✓ Ready! Load sample docs or add your own.';
         status.className = 'success';
+        
         addBtn.disabled = false;
+        loadSampleBtn.disabled = false;
+        clearBtn.disabled = false;
         searchBtn.disabled = false;
+
+        // Build precompiled index in background
+        buildPrecompiledIndex();
 
       } catch (err) {
         status.textContent = `Error: ${err.message}`;
@@ -170,6 +304,68 @@ Rust is a systems programming language focused on safety and performance. It pre
         console.error(err);
       }
     }
+
+    async function buildPrecompiledIndex() {
+      // Build an index from sample docs (simulates loading a pre-built index)
+      precompiledRag = RAG.withEmbedding(new BrowserEmbedding(embedder));
+      for (const doc of sampleDocs) {
+        await precompiledRag.addDocument(doc.id, doc.content, { title: doc.id });
+      }
+      precompiledIndex = precompiledRag.serialize();
+      precompiledCount.textContent = `${precompiledRag.size} chunks from ${sampleDocs.length} documents`;
+    }
+
+    // Mode switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentMode = tab.dataset.mode;
+        
+        if (currentMode === 'dynamic') {
+          dynamicSection.style.display = 'block';
+          precompiledSection.style.display = 'none';
+          modeInfo.innerHTML = '<strong>Dynamic mode:</strong> Embeddings computed in real-time. Add any documents and search instantly.';
+        } else {
+          dynamicSection.style.display = 'none';
+          precompiledSection.style.display = 'block';
+          modeInfo.innerHTML = '<strong>Precompiled mode:</strong> Using pre-built index. Instant search with no embedding computation!';
+        }
+        
+        results.innerHTML = '';
+      });
+    });
+
+    // Sample queries
+    document.querySelectorAll('.sample-queries span').forEach(span => {
+      span.addEventListener('click', () => {
+        searchInput.value = span.textContent;
+        searchBtn.click();
+      });
+    });
+
+    loadSampleBtn.addEventListener('click', async () => {
+      loadSampleBtn.disabled = true;
+      loadSampleBtn.textContent = 'Loading...';
+
+      try {
+        for (let i = 0; i < sampleDocs.length; i++) {
+          status.textContent = `Embedding document ${i + 1}/${sampleDocs.length}: ${sampleDocs[i].id}`;
+          await dynamicRag.addDocument(sampleDocs[i].id, sampleDocs[i].content, { title: sampleDocs[i].id });
+        }
+        
+        status.textContent = `✓ Loaded ${sampleDocs.length} sample documents (${dynamicRag.size} chunks)`;
+        status.className = 'success';
+        updateDocCount();
+
+      } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+        status.className = 'error';
+      }
+
+      loadSampleBtn.disabled = false;
+      loadSampleBtn.textContent = 'Load Sample Docs';
+    });
 
     addBtn.addEventListener('click', async () => {
       const text = docInput.value.trim();
@@ -179,17 +375,17 @@ Rust is a systems programming language focused on safety and performance. It pre
       addBtn.textContent = 'Adding...';
 
       try {
-        // Split by double newlines into separate documents
         const docs = text.split(/\n\n+/).filter(d => d.trim());
         
         for (let i = 0; i < docs.length; i++) {
           status.textContent = `Embedding document ${i + 1}/${docs.length}...`;
-          await rag.addDocument(`doc-${Date.now()}-${i}`, docs[i].trim());
+          await dynamicRag.addDocument(`custom-${Date.now()}-${i}`, docs[i].trim());
         }
 
-        status.textContent = `✓ Added ${docs.length} document(s). Total chunks: ${rag.size}`;
+        status.textContent = `✓ Added ${docs.length} document(s)`;
         status.className = 'success';
-        docCount.textContent = `(${rag.size} chunks indexed)`;
+        updateDocCount();
+        docInput.value = '';
 
       } catch (err) {
         status.textContent = `Error: ${err.message}`;
@@ -200,30 +396,49 @@ Rust is a systems programming language focused on safety and performance. It pre
       addBtn.textContent = 'Add Documents';
     });
 
+    clearBtn.addEventListener('click', () => {
+      dynamicRag.clear();
+      updateDocCount();
+      results.innerHTML = '';
+      status.textContent = '✓ Cleared all documents';
+      status.className = 'success';
+    });
+
     searchBtn.addEventListener('click', async () => {
       const query = searchInput.value.trim();
       if (!query) return;
+
+      const rag = currentMode === 'dynamic' ? dynamicRag : precompiledRag;
+      
+      if (!rag || rag.size === 0) {
+        results.innerHTML = '<p style="color: #888;">No documents indexed. Load sample docs or add your own first.</p>';
+        return;
+      }
 
       searchBtn.disabled = true;
       searchBtn.textContent = 'Searching...';
       results.innerHTML = '';
 
       try {
-        status.textContent = 'Searching...';
-        const searchResults = await rag.search(query, { topK: 3 });
+        const start = performance.now();
+        const searchResults = await rag.search(query, { topK: 4 });
+        const elapsed = (performance.now() - start).toFixed(0);
 
         if (searchResults.length === 0) {
-          results.innerHTML = '<p style="color: #888;">No results found. Try adding some documents first.</p>';
+          results.innerHTML = '<p style="color: #888;">No results found.</p>';
         } else {
           results.innerHTML = searchResults.map((r, i) => `
             <div class="result">
-              <div class="score">#${i + 1} — Score: ${(r.score * 100).toFixed(1)}%</div>
+              <div>
+                <span class="score">#${i + 1} — ${(r.score * 100).toFixed(1)}% match</span>
+                <span class="meta">${r.chunk.metadata?.title || r.chunk.id}</span>
+              </div>
               <div class="content">${escapeHtml(r.chunk.content)}</div>
             </div>
           `).join('');
         }
 
-        status.textContent = `✓ Found ${searchResults.length} result(s)`;
+        status.textContent = `✓ Found ${searchResults.length} result(s) in ${elapsed}ms`;
         status.className = 'success';
 
       } catch (err) {
@@ -236,20 +451,20 @@ Rust is a systems programming language focused on safety and performance. It pre
       searchBtn.textContent = 'Search';
     });
 
-    // Handle enter key in search
     searchInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter' && !searchBtn.disabled) {
-        searchBtn.click();
-      }
+      if (e.key === 'Enter' && !searchBtn.disabled) searchBtn.click();
     });
 
-    function escapeHtml(text) {
-      return text.replace(/[&<>"']/g, c => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-      })[c]);
+    function updateDocCount() {
+      docCount.textContent = dynamicRag.size > 0 
+        ? `${dynamicRag.size} chunks indexed` 
+        : 'No documents indexed';
     }
 
-    // Start loading
+    function escapeHtml(text) {
+      return text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+    }
+
     init();
   </script>
 </body>
