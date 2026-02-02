@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>rag.js + transformers.js Chatbot</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+    h1 { color: #00d9ff; margin-bottom: 5px; }
+    .subtitle { color: #888; margin-bottom: 10px; }
+    .nav { margin-bottom: 20px; }
+    .nav a { color: #00d9ff; text-decoration: none; font-size: 0.9rem; }
+    .nav a:hover { text-decoration: underline; }
+    .section {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    h2 { margin-top: 0; color: #00d9ff; font-size: 1.1rem; }
+    textarea {
+      width: 100%;
+      height: 100px;
+      padding: 10px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #0f0f23;
+      color: #eee;
+      font-family: inherit;
+      font-size: 0.9rem;
+      resize: vertical;
+    }
+    button {
+      background: #00d9ff;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 10px;
+      margin-right: 10px;
+    }
+    button:hover { background: #00b8d9; }
+    button:disabled { background: #555; color: #888; cursor: not-allowed; }
+    button.secondary {
+      background: #333;
+      color: #eee;
+    }
+    button.secondary:hover { background: #444; }
+    #status {
+      padding: 12px;
+      background: #0f0f23;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+    .loading { color: #ffa500; }
+    .success { color: #00ff88; }
+    .error { color: #ff4444; }
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #333;
+      border-radius: 3px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #00d9ff;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      height: 400px;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+      background: #0f0f23;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    .message {
+      margin-bottom: 15px;
+      padding: 12px 15px;
+      border-radius: 12px;
+      max-width: 85%;
+      line-height: 1.5;
+    }
+    .message.user {
+      background: #00d9ff;
+      color: #000;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    .message.assistant {
+      background: #16213e;
+      border: 1px solid #333;
+      border-bottom-left-radius: 4px;
+    }
+    .message.system {
+      background: transparent;
+      color: #666;
+      font-size: 0.85rem;
+      text-align: center;
+      max-width: 100%;
+    }
+    .message .context {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #333;
+    }
+    .chat-input-area {
+      display: flex;
+      gap: 10px;
+    }
+    .chat-input {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #0f0f23;
+      color: #eee;
+      font-size: 1rem;
+    }
+    .chat-input:focus {
+      outline: none;
+      border-color: #00d9ff;
+    }
+    .send-btn {
+      margin-top: 0;
+      padding: 12px 24px;
+    }
+    .doc-count {
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 10px;
+    }
+    .typing {
+      display: inline-flex;
+      gap: 4px;
+    }
+    .typing span {
+      width: 8px;
+      height: 8px;
+      background: #666;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-6px); }
+    }
+    .model-info {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="nav"><a href="index.html">&larr; Back to Demo</a></div>
+
+  <h1>RAG Chatbot</h1>
+  <p class="subtitle">rag.js + transformers.js running entirely in your browser</p>
+
+  <div id="status" class="loading">Initializing...</div>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div class="section">
+    <h2>Knowledge Base</h2>
+    <textarea id="docInput" placeholder="Add documents to the knowledge base (separate with blank lines)..."></textarea>
+    <div>
+      <button id="addBtn" disabled>Add Documents</button>
+      <button id="loadSampleBtn" class="secondary" disabled>Load Sample Docs</button>
+      <button id="clearBtn" class="secondary" disabled>Clear All</button>
+    </div>
+    <div class="doc-count" id="docCount">No documents indexed</div>
+  </div>
+
+  <div class="section">
+    <h2>Chat</h2>
+    <p class="model-info">Using SmolLM 360M for generation, all-MiniLM-L6-v2 for embeddings</p>
+    <div class="chat-container">
+      <div class="chat-messages" id="chatMessages">
+        <div class="message system">Add documents to the knowledge base, then ask questions about them.</div>
+      </div>
+      <div class="chat-input-area">
+        <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question about your documents..." disabled>
+        <button id="sendBtn" class="send-btn" disabled>Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { RAG } from './rag.js';
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+
+    env.allowLocalModels = false;
+
+    const status = document.getElementById('status');
+    const progressFill = document.getElementById('progressFill');
+    const addBtn = document.getElementById('addBtn');
+    const loadSampleBtn = document.getElementById('loadSampleBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const sendBtn = document.getElementById('sendBtn');
+    const docInput = document.getElementById('docInput');
+    const chatInput = document.getElementById('chatInput');
+    const chatMessages = document.getElementById('chatMessages');
+    const docCount = document.getElementById('docCount');
+
+    let rag = null;
+    let embedder = null;
+    let generator = null;
+    let fileProgress = {};
+
+    const sampleDocs = [
+      {
+        id: 'rag-intro',
+        content: `RAG (Retrieval Augmented Generation) is a technique that enhances LLM responses by retrieving relevant context from a knowledge base. Instead of relying solely on the model's training data, RAG finds the most relevant documents and includes them in the prompt, allowing the model to answer questions about specific content it wasn't trained on.`
+      },
+      {
+        id: 'transformers-js',
+        content: `Transformers.js is a JavaScript library that runs machine learning models directly in the browser using WebGPU or WASM. It's compatible with models from Hugging Face and supports tasks like text generation, embeddings, image classification, and more. No server required - everything runs client-side.`
+      },
+      {
+        id: 'rag-js-lib',
+        content: `rag.js is a lightweight RAG library designed for transformers.js. It provides semantic search entirely in the browser with two modes: dynamic mode for real-time embedding, and precompiled mode for instant search with pre-built indices. It uses cosine similarity for vector search and supports automatic text chunking.`
+      },
+      {
+        id: 'embeddings',
+        content: `Embeddings are numerical representations of text that capture semantic meaning. Similar texts have similar embeddings, enabling semantic search. The all-MiniLM-L6-v2 model creates 384-dimensional embeddings and is efficient enough to run in browsers. Embeddings enable finding relevant content even when exact keywords don't match.`
+      },
+      {
+        id: 'vector-search',
+        content: `Vector search finds similar items by comparing embedding vectors. Cosine similarity measures the angle between vectors - identical vectors have similarity 1, orthogonal vectors have 0. This enables semantic search where "machine learning" matches documents about "AI" and "neural networks" even without those exact words.`
+      }
+    ];
+
+    class BrowserEmbedding {
+      constructor(pipe) {
+        this.pipeline = pipe;
+        this.model = 'Xenova/all-MiniLM-L6-v2';
+        this.dimensions = 384;
+      }
+      async embed(texts) {
+        const results = [];
+        for (const text of texts) {
+          const output = await this.pipeline(text, { pooling: 'mean', normalize: true });
+          results.push(Array.from(output.data));
+        }
+        return results;
+      }
+    }
+
+    function updateProgress(file, progress) {
+      if (file) fileProgress[file] = progress || 0;
+      const files = Object.values(fileProgress);
+      const avg = files.reduce((a, b) => a + b, 0) / Math.max(files.length, 1);
+      progressFill.style.width = `${avg}%`;
+    }
+
+    function addMessage(content, role) {
+      const msg = document.createElement('div');
+      msg.className = `message ${role}`;
+      msg.innerHTML = content;
+      chatMessages.appendChild(msg);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return msg;
+    }
+
+    function addTypingIndicator() {
+      const msg = document.createElement('div');
+      msg.className = 'message assistant';
+      msg.id = 'typingIndicator';
+      msg.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+      chatMessages.appendChild(msg);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+      const el = document.getElementById('typingIndicator');
+      if (el) el.remove();
+    }
+
+    async function init() {
+      try {
+        status.textContent = 'Loading embedding model (~23MB)...';
+        status.className = 'loading';
+
+        embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+          quantized: true,
+          progress_callback: (p) => {
+            if (p.file && (p.status === 'downloading' || p.status === 'progress')) {
+              updateProgress(p.file, p.progress);
+            }
+          }
+        });
+
+        rag = RAG.withEmbedding(new BrowserEmbedding(embedder));
+
+        fileProgress = {};
+        status.textContent = 'Loading text generation model (~200MB)...';
+
+        generator = await pipeline('text-generation', 'HuggingFaceTB/SmolLM-360M-Instruct', {
+          dtype: 'q4',
+          device: 'webgpu',
+          progress_callback: (p) => {
+            if (p.file && (p.status === 'downloading' || p.status === 'progress')) {
+              updateProgress(p.file, p.progress);
+            }
+          }
+        });
+
+        status.textContent = 'Ready! Add documents to get started.';
+        status.className = 'success';
+        progressFill.style.width = '100%';
+
+        addBtn.disabled = false;
+        loadSampleBtn.disabled = false;
+        clearBtn.disabled = false;
+        sendBtn.disabled = false;
+        chatInput.disabled = false;
+
+      } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+        status.className = 'error';
+        console.error(err);
+      }
+    }
+
+    loadSampleBtn.addEventListener('click', async () => {
+      loadSampleBtn.disabled = true;
+      loadSampleBtn.textContent = 'Loading...';
+
+      try {
+        for (let i = 0; i < sampleDocs.length; i++) {
+          status.textContent = `Embedding document ${i + 1}/${sampleDocs.length}...`;
+          await rag.addDocument(sampleDocs[i].id, sampleDocs[i].content, { title: sampleDocs[i].id });
+        }
+
+        status.textContent = `Loaded ${sampleDocs.length} documents (${rag.size} chunks)`;
+        status.className = 'success';
+        updateDocCount();
+
+      } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+        status.className = 'error';
+      }
+
+      loadSampleBtn.disabled = false;
+      loadSampleBtn.textContent = 'Load Sample Docs';
+    });
+
+    addBtn.addEventListener('click', async () => {
+      const text = docInput.value.trim();
+      if (!text) return;
+
+      addBtn.disabled = true;
+      addBtn.textContent = 'Adding...';
+
+      try {
+        const docs = text.split(/\n\n+/).filter(d => d.trim());
+
+        for (let i = 0; i < docs.length; i++) {
+          status.textContent = `Embedding document ${i + 1}/${docs.length}...`;
+          await rag.addDocument(`doc-${Date.now()}-${i}`, docs[i].trim());
+        }
+
+        status.textContent = `Added ${docs.length} document(s)`;
+        status.className = 'success';
+        updateDocCount();
+        docInput.value = '';
+
+      } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+        status.className = 'error';
+      }
+
+      addBtn.disabled = false;
+      addBtn.textContent = 'Add Documents';
+    });
+
+    clearBtn.addEventListener('click', () => {
+      rag.clear();
+      updateDocCount();
+      status.textContent = 'Cleared all documents';
+      status.className = 'success';
+    });
+
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !sendBtn.disabled) sendMessage();
+    });
+
+    async function sendMessage() {
+      const query = chatInput.value.trim();
+      if (!query || !rag || rag.size === 0) {
+        if (rag.size === 0) {
+          addMessage('Please add some documents to the knowledge base first.', 'system');
+        }
+        return;
+      }
+
+      chatInput.value = '';
+      sendBtn.disabled = true;
+      chatInput.disabled = true;
+
+      addMessage(query, 'user');
+      addTypingIndicator();
+
+      try {
+        // Get relevant context from RAG
+        const results = await rag.search(query, { topK: 3, minScore: 0.3 });
+
+        let context = '';
+        if (results.length > 0) {
+          context = results.map(r => r.chunk.content).join('\n\n');
+        }
+
+        // Build prompt
+        const messages = [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant. Answer questions based on the provided context. If the context doesn\'t contain relevant information, say so. Be concise.'
+          }
+        ];
+
+        if (context) {
+          messages.push({
+            role: 'user',
+            content: `Context:\n${context}\n\nQuestion: ${query}`
+          });
+        } else {
+          messages.push({
+            role: 'user',
+            content: `Question: ${query}\n\n(No relevant context found in the knowledge base)`
+          });
+        }
+
+        // Generate response
+        const output = await generator(messages, {
+          max_new_tokens: 200,
+          temperature: 0.7,
+          do_sample: true
+        });
+
+        removeTypingIndicator();
+
+        const response = output[0].generated_text[output[0].generated_text.length - 1].content;
+
+        let messageHtml = response;
+        if (results.length > 0) {
+          const sources = results.map(r => `${r.chunk.metadata?.title || r.chunk.id} (${(r.score * 100).toFixed(0)}%)`).join(', ');
+          messageHtml += `<div class="context">Sources: ${sources}</div>`;
+        }
+
+        addMessage(messageHtml, 'assistant');
+
+      } catch (err) {
+        removeTypingIndicator();
+        addMessage(`Error: ${err.message}`, 'system');
+        console.error(err);
+      }
+
+      sendBtn.disabled = false;
+      chatInput.disabled = false;
+      chatInput.focus();
+    }
+
+    function updateDocCount() {
+      docCount.textContent = rag.size > 0
+        ? `${rag.size} chunks indexed`
+        : 'No documents indexed';
+    }
+
+    init();
+  </script>
+</body>
+</html>
