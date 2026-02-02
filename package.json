@@ -1,0 +1,70 @@
+{
+  "name": "rag.js",
+  "version": "0.1.0",
+  "description": "A RAG library for transformers.js with dynamic or precompiled retrieval",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js"
+    }
+  },
+  "bin": {
+    "ragjs": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "rag",
+    "retrieval-augmented-generation",
+    "transformers.js",
+    "embeddings",
+    "vector-search",
+    "browser",
+    "ai"
+  ],
+  "author": "Nolan Cash",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nolancash/rag.js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nolancash/rag.js/issues"
+  },
+  "homepage": "https://github.com/nolancash/rag.js#readme",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "eslint": "^8.55.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@xenova/transformers": "^2.17.0"
+  },
+  "peerDependenciesMeta": {
+    "@xenova/transformers": {
+      "optional": true
+    }
+  }
+}
